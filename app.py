@@ -481,15 +481,27 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+import base64
+
+def get_base64_of_bin_file(bin_file):
+    with open(bin_file, "rb") as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
+
+# encode your logos
+logo1_base64 = get_base64_of_bin_file("logo1.png")
+logo2_base64 = get_base64_of_bin_file("logo2.png")
+
+# banner HTML
 st.markdown(
     f"""
     <div class="header-banner">
-        <img src="{logo1_src}" alt="logo1" class="logo-left">
+        <img src="data:image/png;base64,{logo1_base64}" alt="logo1" class="logo-left">
         <div class="text-content">
             <h1>TAKORADI TECHNICAL UNIVERSITY</h1>
             <h3>Student Final CGPA Predictor</h3>
         </div>
-        <img src="{logo2_src}" alt="logo2" class="logo-right">
+        <img src="data:image/png;base64,{logo2_base64}" alt="logo2" class="logo-right">
     </div>
     """,
     unsafe_allow_html=True,
