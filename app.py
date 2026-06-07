@@ -6,6 +6,7 @@ import statsmodels.api as sm
 from tensorflow.keras.models import load_model
 import base64
 import plotly.express as px
+import plotly.graph_objects as go
 
 def _image_to_data_uri(image_path: str, mime: str = "image/png") -> str:
     try:
@@ -13,7 +14,7 @@ def _image_to_data_uri(image_path: str, mime: str = "image/png") -> str:
             encoded = base64.b64encode(f.read()).decode("utf-8")
         return f"data:{mime};base64,{encoded}"
     except Exception:
-        return image_path  # fallback to path if embedding fails
+        return image_path  
 
 # -----------------------------
 # Load Models & Scaler
@@ -43,456 +44,166 @@ st.set_page_config(
 )
 
 # -----------------------------
-# Custom CSS - Force Light Theme & Professional Styling
+# Base64 Logo Encoder
 # -----------------------------
-logo1_src = _image_to_data_uri("images/logo1.png", mime="image/png")
-logo2_src = _image_to_data_uri("images/logo2.png", mime="image/png")
+def get_base64_of_bin_file(bin_file):
+    try:
+        with open(bin_file, "rb") as f:
+            data = f.read()
+        return base64.b64encode(data).decode()
+    except Exception:
+        return ""
 
+logo1_base64 = get_base64_of_bin_file("logo1.png")
+logo2_base64 = get_base64_of_bin_file("logo2.png")
+
+# -----------------------------
+# Custom CSS - Split Light/Dark Theme & Custom Cards
+# -----------------------------
 st.markdown(
     """
     <style>
-        /* Force light theme and override dark mode */
-        .main {
-            background: #f8f9fa !important;
-            color: #212529 !important;
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        
+        .block-container { max-width: 90% !important; padding: 2rem !important; margin: 0 auto !important; }
+        
+        /* Global Typography & Light Top Background */
+        html, body, [data-testid="stAppViewContainer"], .main { 
+            font-family: 'Inter', sans-serif !important; 
+            background-color: #FFFFFF !important; 
+            color: #0F172A !important; 
         }
         
-        /* Override Streamlit's dark mode */
-        [data-testid="stAppViewContainer"] {
-            background: #f8f9fa !important;
+        /* Header Banner - Yellow/Gold */
+        .header-banner { 
+            background: linear-gradient(135deg, #f59e0b, #fbbf24); 
+            border: 3px solid #d97706; 
+            padding: 1.5rem 2.5rem; 
+            margin-top: 1rem; 
+            margin-bottom: 2rem; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 3.5rem; 
         }
+        .header-banner .logo-left, .header-banner .logo-right { height: 100px; max-height: 100px; width: auto; object-fit: contain; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.15)) contrast(1.1); }
+        .header-banner .text-content { flex: 0 1 auto; text-align: center; }
+        .header-banner h1 { margin: 0; font-size: 2rem; font-weight: 900; letter-spacing: 0.05em; color: #0F172A !important; text-transform: uppercase; text-shadow: 0.5px 0.5px 0px rgba(255,255,255,0.4); }
+        .header-banner h3 { margin: 0.5rem 0 0 0; font-size: 1.25rem; font-weight: 700; color: #1E293B !important; letter-spacing: 0.02em; text-shadow: 0.5px 0.5px 0px rgba(255,255,255,0.4); }
         
-        /* Force all text to be visible */
-        .stMarkdown, .stText, .stMetric, .stRadio, .stNumberInput, .stButton, .stFileUploader {
-            color: #212529 !important;
-        }
-        
-        /* Header banner */
-        .header-banner {
-            background: linear-gradient(135deg, #f59e0b, #fbbf24);
-            padding: 2.4rem;
-            text-align: center;
-            color: #1f2937;
-            border-radius: 16px;
-            margin-bottom: 2rem;
-            box-shadow: 0 8px 32px rgba(245, 158, 11, 0.4);
-            border: 3px solid #d97706;
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-        }
-        
-        .header-banner .logo-left {
-            height: 160px;
-            max-height: 160px;
-            width: auto;
-            max-width: 300px;
-            object-fit: contain;
-            margin-left: 1rem;
-        }
-        
-        .header-banner .logo-right {
-            height: 160px;
-            max-height: 160px;
-            width: auto;
-            max-width: 300px;
-            object-fit: contain;
-            margin-right: 1rem;
-        }
-        
-        .header-banner .text-content {
-            flex: 1;
-            text-align: center;
-        }
-        
-        .header-banner h1 {
-            margin: 0;
-            font-size: 3.2rem;
-            font-weight: 900;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            letter-spacing: 2px;
-            color: #1f2937;
-        }
-        
-        .header-banner h3 {
-            margin: 1rem 0 0 0;
-            font-size: 1.85rem;
-            font-weight: 700;
-            opacity: 1;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.2);
-            color: #374151;
-        }
-
-        /* Responsive logo and text sizing */
-        @media (max-width: 1200px) {
-            .header-banner .logo-left, .header-banner .logo-right { height: 130px; max-height: 130px; }
-            .header-banner h1 { font-size: 2.8rem; }
-            .header-banner h3 { font-size: 1.65rem; }
-        }
-        @media (max-width: 992px) {
-            .header-banner { padding: 1.9rem; }
-            .header-banner .logo-left, .header-banner .logo-right { height: 110px; max-height: 110px; }
-            .header-banner h1 { font-size: 2.4rem; }
-            .header-banner h3 { font-size: 1.45rem; }
-        }
-        @media (max-width: 640px) {
-            .header-banner { padding: 1.25rem; }
-            .header-banner .logo-left, .header-banner .logo-right { height: 80px; max-height: 80px; }
-            .header-banner h1 { font-size: 1.75rem; letter-spacing: 1px; }
-            .header-banner h3 { font-size: 1.2rem; }
-        }
-
         /* Dashboard title */
-        .dashboard-title {
-            text-align: center;
-            color: #1e3a8a;
-            font-size: 2rem;
-            font-weight: 700;
-            margin: 1.5rem 0;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
-        }
-
-       /* Metric cards - Compact and square */
-        [data-testid="stMetric"] {
-        background: white;
-        border: 2px solid #e5e7eb;
-        border-radius: 12px;
-        padding: 1.4rem;
-        text-align: center;
-        margin: 0.5rem;
-        color: inherit;
-        box-shadow: 0 8px 20px rgba(37, 99, 235, 0.20);
-        transition: all 0.25s ease;
-        min-height: 130px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        }
-
-        [data-testid="stMetric"]:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 28px rgba(30, 64, 175, 0.30);
-            border-color: #1e40af;
-        }
-
-        /* Make METRIC HEADERS bold, centered, larger */
-        [data-testid="stMetricLabel"] {
-            font-size: 28px !important;
-            font-weight: 900 !important;
-            color: #111827 !important;
-            text-align: center !important;
-            display: block !important;
-            margin-bottom: 0.4rem;
-        }
-
-        /* Keep METRIC VALUES bold & centered but slightly larger */
-        [data-testid="stMetricValue"] {
-            font-size: 24px !important;
-            font-weight: 700 !important;
-            color: #1e3a8a !important;
-            text-align: center !important;
-        }
-
-
-        /* Summary panel cards - Compact and square */
-        .summary-card {
-            background: white;
-            border-radius: 12px;
-            padding: 1.2rem;
-            margin: 0.5rem 0;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-            border-left: 4px solid #3b82f6;
-            min-height: 120px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
+        .dashboard-title { 
+            color: #475569 !important; 
+            font-size: 1.3rem !important; 
+            font-weight: 800 !important; 
+            margin: 0 0 1.5rem 0 !important; 
+            text-transform: uppercase !important; 
+            letter-spacing: 0.08em !important; 
+            border-left: 4px solid #CBD5E1 !important; 
+            padding-left: 0.75rem !important; 
+            line-height: 1.2 !important;
         }
         
-        .summary-card h4 {
-            color: #1e3a8a;
-            margin: 0 0 0.5rem 0;
-            font-size: 1.1rem;
-        }
-        
-        .summary-card .bold {
-            font-weight: 700;
-            color: #1e3a8a;
-        }
-
-        /* Radio buttons styling (Choose Prediction Mode) */
-        div[role="radiogroup"] {
-            background: #ffffff;
-            padding: 1rem 1.5rem;
-            border-radius: 14px;
-            border: 3px solid #1e3a8a; /* deep blue outline */
-            margin: 1.25rem 0 1.75rem 0;
-            box-shadow: 0 10px 24px rgba(30, 64, 175, 0.20);
-        }
-        
-        /* Increase text size and weight for mode options */
-        div[role="radiogroup"] label {
-            color: #1e3a8a !important;
-            font-weight: 800 !important;
-            font-size: 1.15rem !important;
-        }
-
-        /* Style the control label: "Choose Prediction Mode:" */
-        div[data-testid="stRadio"] > label {
-            font-size: 1.35rem !important;
-            font-weight: 900 !important;
-            color: #111827 !important;
-            margin-bottom: 0.4rem !important;
-            display: inline-block !important;
-        }
-        
-        /* Title for the radio control (if rendered by Streamlit) */
-        div[role="radiogroup"] ~ div p,
-        div[role="radiogroup"] p {
-            font-size: 1.15rem !important;
-            font-weight: 800 !important;
-            color: #1f2937 !important;
-        }
-
-        /* Number input fields */
-        /* Number input cards */
-        /* Removed inner inputs-card to avoid double card */
-        .inputs-card { padding: 0; margin: 0; border: none; box-shadow: none; }
-
-        .inputs-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr); /* place subjects side by side */
-            column-gap: 1.25rem;
-            row-gap: 0.5rem;
-            align-items: start;
-            justify-items: start;
-        }
-        @media (max-width: 992px) {
-            .inputs-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-
-        /* Place each number input as a compact block */
-        div[data-testid="stNumberInput"] {
-            background: transparent;
-            border-radius: 0;
-            padding: 0;  /* remove inner padding so fields sit flush inside the card */
-            margin: 0;   /* no outer margin to avoid separation */
-            border: none;
-            box-shadow: none;
+        /* Custom Metric Cards HTML/CSS */
+        .custom-metric-container {
             display: flex;
             align-items: center;
-            justify-content: center;
-            flex-direction: column;
-        }
-
-        /* Ensure subject label sits above input and is bold */
-        div[data-testid="stNumberInput"] label {
-            display: block !important;
-            width: 100% !important;
-            text-align: center !important;
-            margin-bottom: 0.4rem !important;
-            font-weight: 900 !important;
-            font-size: 1.75rem !important; /* larger subject names */
-            color: #1e3a8a !important; /* deep blue */
-        }
-
-        /* Compact, centered input bar */
-        .stNumberInput { display: inline-flex !important; }
-        .stNumberInput > div { width: auto !important; }
-        .stNumberInput > div > div { width: auto !important; }
-        .stNumberInput > div > div > input {
-            height: 2.3rem !important;
-            width: 130px !important; /* slightly wider for visibility */
-            border: 3px solid #f59e0b !important; /* deep yellow border */
-            border-radius: 8px !important;
-            color: #1e3a8a !important;
-            text-align: center !important;
-            background: #f3f4f6 !important; /* light gray bar */
-        }
-
-        /* Remove number input steppers (plus/minus) */
-        input[type=number]::-webkit-outer-spin-button,
-        input[type=number]::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-        input[type=number] { -moz-appearance: textfield; }
-        
-        .stNumberInput > div > div > input:focus {
-            border-color: #3b82f6 !important;
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
-        }
-        
-        .stNumberInput label {
-            color: #1e3a8a !important;
-            font-weight: 600;
-        }
-
-        /* Prediction button - improve contrast */
-        .stButton > button {
-            background: linear-gradient(135deg, #2563eb, #1e3a8a); /* deep blue */
-            color: #ffffff; /* white text for contrast */
-            border-radius: 12px;
-            padding: 0.85rem 1.6rem;
-            font-weight: 900;
-            border: 2px solid #1e3a8a; /* deep blue outline */
-            font-size: 1.05rem;
-            transition: all 0.25s ease;
-            box-shadow: 0 6px 16px rgba(30, 64, 175, 0.35);
-        }
-        
-        .stButton > button:hover {
-            background: linear-gradient(135deg, #1d4ed8, #1e40af); /* deeper blue on hover */
-            color: #ffffff;
-            transform: translateY(-1px);
-            box-shadow: 0 10px 24px rgba(30, 64, 175, 0.45);
-            border-color: #1e40af;
-        }
-
-        /* Prediction result cards - Square, deep yellow with shadow */
-        .result-card {
-            background: #e0f2fe; /* light blue */
-            border: 3px solid #1e3a8a; /* deep blue border */
-            border-radius: 14px;
-            padding: 0.8rem;
-            margin: 0.35rem; /* slight spacing on each card */
-            text-align: center;
-            font-weight: 700;
-            color: #0c4a6e; /* deep blue text */
-            box-shadow: 0 12px 28px rgba(30, 64, 175, 0.35); /* blue shadow */
-            aspect-ratio: 1 / 1; /* make it square */
-            width: 100%;
-            max-width: 200px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        
-        .result-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 16px 32px rgba(30, 64, 175, 0.45);
-        }
-        
-        .result-card .prediction-value {
-            font-size: 1.6rem;
-            font-weight: 900;
-            color: #0c4a6e;
-            margin-top: 0.4rem;
-        }
-
-        /* Results row to keep cards close together */
-        .result-row {
-            display: flex;
-            gap: 1rem; /* open spacing a bit more */
-            align-items: stretch;
-            flex-wrap: wrap;
-        }
-        .result-row .result-card { margin: 0 !important; }
-
-        /* Subheaders */
-        .stSubheader {
-            color: #1e3a8a !important;
-            font-weight: 600;
-            margin: 1.5rem 0 1rem 0;
-        }
-        
-                /* File uploader */
-        .stFileUploader > div {
-            background: white;
-            border: 2px solid #e5e7eb;
-            border-radius: 12px;
-            padding: 1rem;
-            color: #1e3a8a !important;
-            max-width: 400px; /* Added: Limit the width */
-            margin: 0 auto; /* Added: Center the uploader */
-        }
-        
-        .stFileUploader label {
-            color: #1e3a8a !important;
-            font-weight: 600;
-            text-align: ; /* Center the label */
-            display: block; /* Make label take full width to center */
-        }
-        
-        /* Dataframe styling */
-        .stDataFrame {
-            background: white;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        }
-        
-        /* Success message */
-        .stSuccess {
-            background: #d1fae5;
-            color: #065f46;
-            border: 1px solid #10b981;
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
             border-radius: 8px;
-            padding: 1rem;
-            margin: 1rem 0;
+            padding: 1.75rem 1.5rem; 
+            gap: 1.5rem; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            margin-bottom: 1.5rem;
+        }
+        .custom-metric-container.blue { border-top: 4px solid #3B82F6; }
+        .custom-metric-container.gold { border-top: 4px solid #F59E0B; }
+        .custom-metric-container.green { border-top: 4px solid #10B981; }
+        .custom-metric-container.purple { border-top: 4px solid #8B5CF6; }
+
+        .icon-box { width: 56px; height: 56px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .icon-box svg { width: 28px; height: 28px; } 
+        .icon-box.blue { background: #EFF6FF; color: #3B82F6; }
+        .icon-box.gold { background: #FFFBEB; color: #F59E0B; }
+        .icon-box.green { background: #ECFDF5; color: #10B981; }
+        .icon-box.purple { background: #F5F3FF; color: #8B5CF6; }
+
+        .metric-content { display: flex; flex-direction: column; }
+        .metric-label { font-size: 1rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem; } 
+        .metric-value { font-size: 2.2rem; font-weight: 800; color: #0F172A; line-height: 1; } 
+
+        div[data-testid="stMetric"] { display: none !important; }
+
+        /* Expander Styling for Help Section */
+        .stExpander { border: 1px solid #E2E8F0 !important; border-radius: 8px !important; margin-bottom: 1rem !important; background: #F8FAFC !important; }
+        .stExpander summary p { font-weight: 800 !important; color: #0F172A !important; letter-spacing: 0.05em !important; text-transform: uppercase !important; font-size: 0.95rem !important; }
+        
+        /* Guide Cards Inside Expander */
+        .guide-box { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 1.25rem; height: 100%; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+        .guide-title { font-size: 1.05rem; font-weight: 800; color: #0F172A; margin-bottom: 0.5rem; margin-top: 0; display: flex; align-items: center; gap: 0.5rem; }
+        .guide-text { font-size: 0.9rem; color: #475569; line-height: 1.5; margin: 0; }
+        .guide-title svg { width: 18px; height: 18px; color: #F59E0B; }
+
+        /* DARK BLUE WORKSPACE */
+        div[data-testid="stTabs"] {
+            background-color: #0A1E3F !important;
+            padding: 2rem !important;
+            border-radius: 12px !important;
+            margin-top: 1rem !important;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
         }
         
-        /* Download button */
-        .stDownloadButton > button {
-            background: linear-gradient(135deg, #059669, #10b981);
-            color: white;
-            border-radius: 12px;
-            padding: 0.8rem 1.5rem;
-            font-weight: 600;
-            border: none;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+        div[data-testid="stTabs"] p, div[data-testid="stTabs"] h1, div[data-testid="stTabs"] h2, div[data-testid="stTabs"] h3, div[data-testid="stTabs"] .stMarkdown {
+            color: #F8FAFC !important;
+        }
+
+        /* Tabs Styling */
+        .stTabs [data-baseweb="tab-list"] { gap: 2rem; background: transparent; }
+        .stTabs [data-baseweb="tab"] { height: 55px; white-space: pre-wrap; font-weight: 700; font-size: 1.2rem; color: #94A3B8; }
+        .stTabs [aria-selected="true"] { color: #FBBF24 !important; border-bottom-color: #FBBF24 !important; border-bottom-width: 3px !important; }
+        
+        /* Inputs & Plus/Minus Controls Styling */
+        div[data-testid="stTabs"] div[data-testid="stNumberInput"] label { color: #94A3B8 !important; font-size: 0.8rem !important; font-weight: 700 !important; text-transform: uppercase !important; letter-spacing: 0.05em !important; }
+        div[data-testid="stTabs"] .stNumberInput input { 
+            height: 2.5rem !important; 
+            background: #112A46 !important; 
+            border: 1px solid #1E3A5F !important; 
+            border-radius: 4px !important; 
+            color: #F8FAFC !important; 
+            text-align: center !important; font-size: 1rem !important; font-weight: 600 !important; 
         }
         
-        .stDownloadButton > button:hover {
-            background: linear-gradient(135deg, #047857, #059669);
-            transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4);
+        div[data-testid="stNumberInputStepUp"] svg,
+        div[data-testid="stNumberInputStepDown"] svg { fill: #FBBF24 !important; }
+
+        div[data-testid="stTabs"] .stFileUploader > div { background: #112A46 !important; border: 1px dashed #3B82F6 !important; }
+        div[data-testid="stTabs"] .stFileUploader label { color: #F8FAFC !important; }
+
+        div[data-testid="stTabs"] .stDataFrame { background: #112A46 !important; }
+        div[data-testid="stTabs"] .stExpander { background-color: #112A46 !important; border: 1px solid #1E3A5F !important; }
+
+        /* Universal Buttons (Gold) */
+        .stButton > button, .stDownloadButton > button { 
+            background: #F59E0B !important; 
+            color: #0F172A !important; 
+            border-radius: 4px !important; 
+            border: none !important; 
+            padding: 0.75rem 2rem !important; 
+            font-weight: 800 !important; 
+            text-transform: uppercase !important; 
+            width: auto !important; 
+            min-width: 220px; 
+            transition: all 0.2s ease !important;
         }
-        
-        /* Card wrapper for the marks inputs (left-aligned) */
-        .marks-card {
-            background: #fffbeb; /* light deep-yellow tint */
-            border-radius: 12px;
-            padding: 0.75rem 1rem 1rem 1rem;
-            margin: 0.75rem 0;
-            border: 3px solid #f59e0b; /* deep yellow */
-            box-shadow: 0 14px 28px rgba(30, 64, 175, 0.35); /* deep blue */
-            max-width: 900px;
-            display: inline-block; /* left-align under caption */
-        }
-        
-        /* Override any remaining dark mode elements */
-        * {
-            color: inherit !important;
-        }
-        
-        /* Ensure all text inputs are visible */
-        input, textarea, select {
-            color: #1e3a8a !important;
-            background: white !important;
-        }
+        .stButton > button:hover, .stDownloadButton > button:hover { background: #FBBF24 !important; transform: translateY(-1px); }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-import base64
-
-def get_base64_of_bin_file(bin_file):
-    with open(bin_file, "rb") as f:
-        data = f.read()
-    return base64.b64encode(data).decode()
-
-# encode your logos
-logo1_base64 = get_base64_of_bin_file("logo1.png")
-logo2_base64 = get_base64_of_bin_file("logo2.png")
-
-# banner HTML
+# -----------------------------
+# Header Banner Rendering
+# -----------------------------
 st.markdown(
     f"""
     <div class="header-banner">
@@ -506,131 +217,188 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-st.markdown(
-    """
-    <style>
-    /* Target the whole metric block */
-    div[data-testid="stMetric"] {
-        text-align: center;
-    }
-
-    /* First line inside metric (label) */
-    div[data-testid="stMetric"] label, 
-    div[data-testid="stMetric"] p {
-        font-size: 28px !important;
-        font-weight: 700 !important;
-        color: #111827 !important;
-    }
-
-    /* Value text inside metric */
-    div[data-testid="stMetric"] > div > div {
-        font-size: 26px !important;
-        font-weight: 900 !important;
-        color: #1e3a8a !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 
 # -----------------------------
-# Dashboard Rendering Function
+# Top Dashboard Rendering (Light Theme)
 # -----------------------------
-def render_dashboard(df=None, mlr_metrics=None, ann_metrics=None):
-    st.markdown('<h2 class="dashboard-title">Student Performance Dashboard</h2>', unsafe_allow_html=True)
+st.markdown('<div class="dashboard-title">Student Performance Dashboard</div>', unsafe_allow_html=True)
 
-    # Calculate stats if df exists
-    total_students = df.shape[0] if df is not None else 0
-    best_model = "MLR" if mlr_metrics and mlr_metrics["R2"] > (ann_metrics["R2"] if ann_metrics else -1) else "ANN"
-    best_acc = max(mlr_metrics["R2"], ann_metrics["R2"]) if (mlr_metrics and ann_metrics) else 0
-
-    col1, col2, col3, col4 = st.columns(4)
-    with col1: 
-        st.metric("Total Students Analyzed", total_students)
-    with col2: 
-        st.metric("Available Models", "2 (MLR, ANN)")
-    with col3: 
-        st.metric("Best Accuracy", f"{best_acc:.2%} ({best_model})")
-    with col4: 
-        st.metric("Last Training Run", "2 days ago")
-
-    # Summary panel intentionally omitted here to avoid duplication
-
-# -----------------------------
-# Load Default Dataset (Optional)
-# -----------------------------
 try:
     base_df = pd.read_csv("Dataset.csv")
+    total_students = base_df.shape[0]
 except:
     base_df = None
+    total_students = 0
 
 mlr_metrics = {"R2": 0.93, "MAE": 0.051, "RMSE": 0.071}
 ann_metrics = {"R2": -0.597, "MAE": 0.293, "RMSE": 0.339}
 
-render_dashboard(base_df, mlr_metrics, ann_metrics)
+best_model = "MLR" if mlr_metrics["R2"] > ann_metrics["R2"] else "ANN"
+best_acc = max(mlr_metrics["R2"], ann_metrics["R2"])
+
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    st.markdown(f"""
+        <div class="custom-metric-container blue">
+            <div class="icon-box blue">
+                <svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            </div>
+            <div class="metric-content">
+                <div class="metric-label">Total Students Analyzed</div>
+                <div class="metric-value">{total_students:,}</div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+with col2:
+    st.markdown(f"""
+        <div class="custom-metric-container gold">
+            <div class="icon-box gold">
+                <svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+            </div>
+            <div class="metric-content">
+                <div class="metric-label">Available Models</div>
+                <div class="metric-value">2 <span style="font-size: 1.1rem; color: #64748B; font-weight: 600; vertical-align: middle;">(MLR, ANN)</span></div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+with col3:
+    st.markdown(f"""
+        <div class="custom-metric-container green">
+            <div class="icon-box green">
+                <svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
+            </div>
+            <div class="metric-content">
+                <div class="metric-label">Best Accuracy</div>
+                <div class="metric-value">{best_acc:.2%} <span style="font-size: 1.1rem; color: #64748B; font-weight: 600; vertical-align: middle;">({best_model})</span></div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+with col4:
+    st.markdown(f"""
+        <div class="custom-metric-container purple">
+            <div class="icon-box purple">
+                <svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            </div>
+            <div class="metric-content">
+                <div class="metric-label">Last Training Run</div>
+                <div class="metric-value">2 Days</div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
 
 # -----------------------------
-# Mode Selection
+# System Guide & Help Section
 # -----------------------------
-st.markdown("<br>", unsafe_allow_html=True)
-mode = st.radio(
-    "Choose Prediction Mode:",
-    ["Single Prediction", "Batch Prediction (CSV)"],
-    horizontal=True
-)
+with st.expander("SYSTEM GUIDE & ML OVERVIEW"):
+    st.markdown("""
+    <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+        <div class="guide-box" style="flex: 1; border-top: 3px solid #3B82F6;">
+            <h4 class="guide-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg> 1. Select Mode</h4>
+            <p class="guide-text">Choose the <strong>Single Prediction</strong> tab to evaluate one student, or the <strong>Batch Analytics</strong> tab to process an entire class at once via CSV upload.</p>
+        </div>
+        <div class="guide-box" style="flex: 1; border-top: 3px solid #F59E0B;">
+            <h4 class="guide-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg> 2. Input Data</h4>
+            <p class="guide-text">Input the core subject scores (Social Studies, Science, English, Math). Ensure inputs are standardized between 0 and 100 for accurate model scaling.</p>
+        </div>
+        <div class="guide-box" style="flex: 1; border-top: 3px solid #10B981;">
+            <h4 class="guide-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> 3. Generate Results</h4>
+            <p class="guide-text">Click predict to instantly route the data through both AI models. The system will output predicted CGPAs alongside automated performance distributions.</p>
+        </div>
+    </div>
+    <div style="display: flex; gap: 1rem;">
+        <div class="guide-box" style="flex: 1; background: #F1F5F9;">
+            <h4 class="guide-title" style="color: #334155;">Multiple Linear Regression (MLR)</h4>
+            <p class="guide-text">Acts as the baseline statistical model. It calculates the final CGPA by finding the direct, weighted mathematical relationship between the four core subjects. Highly stable and interpretable.</p>
+        </div>
+        <div class="guide-box" style="flex: 1; background: #F1F5F9;">
+            <h4 class="guide-title" style="color: #334155;">Artificial Neural Network (ANN)</h4>
+            <p class="guide-text">A deep learning approach that processes inputs through interconnected computational layers. It excels at identifying complex, non-linear performance patterns that standard regression might miss.</p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
 
 # -----------------------------
-# SINGLE PREDICTION
+# Main Application Tabs
 # -----------------------------
-if "Single" in mode:
-    st.subheader("Enter Student Marks for Prediction")
+tab1, tab2 = st.tabs(["Single Prediction Interface", "Batch Analytics & Prediction"])
+
+# -----------------------------
+# SINGLE PREDICTION TAB
+# -----------------------------
+with tab1:
+    st.markdown("### Enter Student Marks")
     c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        social = st.number_input("Social Studies", 0.0, 100.0, 72.0, format="%.1f")
-    with c2:
-        science = st.number_input("Integrated Science", 0.0, 100.0, 75.0, format="%.1f")
-    with c3:
-        english = st.number_input("English Language", 0.0, 100.0, 59.0, format="%.1f")
-    with c4:
-        maths = st.number_input("Mathematics", 0.0, 100.0, 85.0, format="%.1f")
+    with c1: social = st.number_input("Social Studies", min_value=0.0, max_value=100.0, value=72.0, step=1.0, format="%.1f")
+    with c2: science = st.number_input("Integrated Science", min_value=0.0, max_value=100.0, value=75.0, step=1.0, format="%.1f")
+    with c3: english = st.number_input("English Language", min_value=0.0, max_value=100.0, value=59.0, step=1.0, format="%.1f")
+    with c4: maths = st.number_input("Mathematics", min_value=0.0, max_value=100.0, value=85.0, step=1.0, format="%.1f")
 
-    if st.button("Predict Final CGPA"):
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("Predict Final CGPA", key="predict_btn"):
         input_df = pd.DataFrame([{
-            "Social Studies": social,
-            "Integrated Science": science,
-            "English Language": english,
-            "Mathematics": maths
+            "Social Studies": social, "Integrated Science": science,
+            "English Language": english, "Mathematics": maths
         }])
 
         mlr_pred = mlr_model.predict(sm.add_constant(input_df[mlr_features], has_constant="add"))[0]
+        
         input_for_ann_scaling = pd.DataFrame(0.0, index=[0], columns=scaler.feature_names_in_)
-        input_for_ann_scaling["Social Studies"] = social
-        input_for_ann_scaling["Integrated Science"] = science
-        input_for_ann_scaling["English Language"] = english
-        input_for_ann_scaling["Mathematics"] = maths
+        for col in ["Social Studies", "Integrated Science", "English Language", "Mathematics"]:
+            input_for_ann_scaling[col] = input_df[col][0]
         ann_input_scaled = scaler.transform(input_for_ann_scaling)
         ann_pred = ann_model.predict(ann_input_scaled, verbose=0)[0][0]
 
-        st.markdown(
-            f'<div class="result-row">'
-            f'<div class="result-card">MLR Prediction<div class="prediction-value">{mlr_pred:.2f}</div></div>'
-            f'<div class="result-card">ANN Prediction<div class="prediction-value">{ann_pred:.2f}</div></div>'
-            f'</div>',
-            unsafe_allow_html=True
-        )
+        st.markdown("---")
+        st.markdown("### Prediction Results")
+        
+        fig_col1, fig_col2 = st.columns(2)
+        
+        with fig_col1:
+            fig1 = go.Figure(go.Indicator(
+                mode = "gauge+number", value = mlr_pred, title = {'text': "MLR Prediction", 'font': {'color': '#F8FAFC'}},
+                number = {'font': {'color': '#F8FAFC'}},
+                gauge = {'axis': {'range': [0, 5.0], 'tickcolor': "#F8FAFC"}, 'bar': {'color': "#F59E0B"},
+                         'bgcolor': "#06142E",
+                         'steps' : [{'range': [0, 2.0], 'color': "#7F1D1D"},
+                                    {'range': [2.0, 3.5], 'color': "#78350F"},
+                                    {'range': [3.5, 5.0], 'color': "#064E3B"}]}
+            ))
+            fig1.update_layout(height=300, margin=dict(l=20, r=20, t=50, b=20), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+            st.plotly_chart(fig1, use_container_width=True)
+            
+        with fig_col2:
+            fig2 = go.Figure(go.Indicator(
+                mode = "gauge+number", value = ann_pred, title = {'text': "ANN Prediction", 'font': {'color': '#F8FAFC'}},
+                number = {'font': {'color': '#F8FAFC'}},
+                gauge = {'axis': {'range': [0, 5.0], 'tickcolor': "#F8FAFC"}, 'bar': {'color': "#3B82F6"},
+                         'bgcolor': "#06142E",
+                         'steps' : [{'range': [0, 2.0], 'color': "#7F1D1D"},
+                                    {'range': [2.0, 3.5], 'color': "#78350F"},
+                                    {'range': [3.5, 5.0], 'color': "#064E3B"}]}
+            ))
+            fig2.update_layout(height=300, margin=dict(l=20, r=20, t=50, b=20), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+            st.plotly_chart(fig2, use_container_width=True)
 
 # -----------------------------
-# BATCH PREDICTION
+# BATCH PREDICTION TAB
 # -----------------------------
-else:
-    st.subheader("Upload CSV for Batch Prediction")
+with tab2:
+    st.markdown("### Upload Dataset for Batch Processing")
     file = st.file_uploader("Upload CSV file", type=["csv"])
 
     if file:
         df_in = pd.read_csv(file)
-        st.write("### Preview Data", df_in.head())
+        
+        with st.expander("Preview Raw Data"):
+            st.dataframe(df_in.head())
 
-        mlr_preds = mlr_model.predict(sm.add_constant(df_in[mlr_features], has_constant="add")).ravel()
+        # FIX: Changed .ravel() to .to_numpy() to prevent Series attribute errors
+        mlr_preds = mlr_model.predict(sm.add_constant(df_in[mlr_features], has_constant="add")).to_numpy()
         df_for_ann_scaling = pd.DataFrame(0.0, index=df_in.index, columns=scaler.feature_names_in_)
         for col in df_in.columns:
             if col in df_for_ann_scaling.columns:
@@ -641,54 +409,51 @@ else:
         out["FGPA_MLR_Pred"] = mlr_preds
         out["FGPA_ANN_Pred"] = ann_preds
 
-        format_dict = {col: "{:.1f}" for col in ["Social Studies", "Integrated Science", "English Language", "Mathematics"]}
-        format_dict.update({"FGPA_MLR_Pred": "{:.2f}", "FGPA_ANN_Pred": "{:.2f}"})
+        st.success("Batch prediction complete!")
+        
+        col_down1, col_down2 = st.columns([1, 4])
+        with col_down1:
+            st.download_button(
+                "Download Results",
+                data=out.to_csv(index=False, float_format="%.2f").encode("utf-8"),
+                file_name="predictions.csv",
+                mime="text/csv"
+            )
 
-        st.success("Batch prediction complete")
-        st.dataframe(out.head(20).style.format(format_dict))
+        st.markdown("---")
+        st.markdown("### Batch Analytics Panel")
 
-        st.download_button(
-            "Download Predictions CSV",
-            data=out.to_csv(index=False, float_format="%.2f").encode("utf-8"),
-            file_name="predictions.csv",
-            mime="text/csv"
-        )
-                # -----------------------------
-        # Summary Panel & Final CGPA Statistics
-        # -----------------------------
-        st.markdown("##  Summary Panel")
-
-        # Dataset Overview
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Records", out.shape[0])
-        with col2:
-            st.metric("Total Missing Values", out.isnull().sum().sum())
-        with col3:
-            st.metric("Number of Columns", out.shape[1])
-
-        # Missing Values per Column
-        missing_cols = out.isnull().sum()
-        missing_cols = missing_cols[missing_cols > 0]
-        if not missing_cols.empty:
-            st.subheader(" Missing Values per Column")
-            st.table(missing_cols)
-
-        # Final CGPA Statistics (use predictions if "Final CGPA" not in dataset)
         target_col = "Final CGPA" if "Final CGPA" in out.columns else "FGPA_MLR_Pred"
-        st.subheader(" Final CGPA Statistics")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Mean CGPA", round(out[target_col].mean(), 2))
-            st.metric("Median CGPA", round(out[target_col].median(), 2))
-        with col2:
-            st.metric("Std Dev", round(out[target_col].std(), 2))
-            st.metric("Minimum", round(out[target_col].min(), 2))
-        with col3:
-            st.metric("Maximum", round(out[target_col].max(), 2))
+        
+        st.markdown(f"""
+        <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+            <div class="custom-metric-container" style="flex: 1; background: #112A46; border: 1px solid #1E3A5F; margin-bottom: 0;">
+                <div class="metric-content">
+                    <div class="metric-label" style="color: #94A3B8;">Mean CGPA</div>
+                    <div class="metric-value" style="color: #F8FAFC;">{round(out[target_col].mean(), 2)}</div>
+                </div>
+            </div>
+            <div class="custom-metric-container" style="flex: 1; background: #112A46; border: 1px solid #1E3A5F; margin-bottom: 0;">
+                <div class="metric-content">
+                    <div class="metric-label" style="color: #94A3B8;">Median CGPA</div>
+                    <div class="metric-value" style="color: #F8FAFC;">{round(out[target_col].median(), 2)}</div>
+                </div>
+            </div>
+            <div class="custom-metric-container" style="flex: 1; background: #112A46; border: 1px solid #1E3A5F; margin-bottom: 0;">
+                <div class="metric-content">
+                    <div class="metric-label" style="color: #94A3B8;">Highest CGPA</div>
+                    <div class="metric-value" style="color: #F8FAFC;">{round(out[target_col].max(), 2)}</div>
+                </div>
+            </div>
+            <div class="custom-metric-container" style="flex: 1; background: #112A46; border: 1px solid #1E3A5F; margin-bottom: 0;">
+                <div class="metric-content">
+                    <div class="metric-label" style="color: #94A3B8;">Lowest CGPA</div>
+                    <div class="metric-value" style="color: #F8FAFC;">{round(out[target_col].min(), 2)}</div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-        # Performance Distribution
-        st.subheader(" Performance Distribution")
         excellent = out[out[target_col] >= 3.5].shape[0]
         good = out[(out[target_col] >= 3.0) & (out[target_col] < 3.5)].shape[0]
         average = out[(out[target_col] >= 2.0) & (out[target_col] < 3.0)].shape[0]
@@ -696,21 +461,26 @@ else:
         total = out.shape[0]
 
         dist_df = pd.DataFrame({
-            "Category": ["Excellent (≥3.5)", "Good (3.0-3.49)", "Average (2.0-2.99)", "Below Average (<2.0)"],
-            "Count": [excellent, good, average, below_avg],
-            "Percentage": [
-                round(excellent/total*100, 1),
-                round(good/total*100, 1),
-                round(average/total*100, 1),
-                round(below_avg/total*100, 1)
-            ]
+            "Category": ["Excellent (≥3.5)", "Good (3.0-3.4)", "Average (2.0-2.9)", "Below Average (<2.0)"],
+            "Count": [excellent, good, average, below_avg]
         })
-        st.table(dist_df)
 
-        # Final CGPA Distribution Graph
-        fig = px.histogram(
-            out, x=target_col, nbins=20,
-            title="Final CGPA Distribution",
-            color_discrete_sequence=["#004080"]
-        )
-        st.plotly_chart(fig, use_container_width=True)
+        chart_col1, chart_col2 = st.columns(2)
+        
+        with chart_col1:
+            fig_hist = px.histogram(
+                out, x=target_col, nbins=20,
+                title="Predicted CGPA Histogram",
+                color_discrete_sequence=["#3B82F6"]
+            )
+            fig_hist.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='#F8FAFC')
+            st.plotly_chart(fig_hist, use_container_width=True)
+            
+        with chart_col2:
+            fig_pie = px.pie(
+                dist_df, values='Count', names='Category', hole=0.4,
+                title="Performance Tier Breakdown",
+                color_discrete_sequence=["#10B981", "#3B82F6", "#F59E0B", "#EF4444"]
+            )
+            fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='#F8FAFC')
+            st.plotly_chart(fig_pie, use_container_width=True)
